@@ -30,9 +30,9 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <div className="bg-brand-red p-1.5 rounded-lg shadow-lg shadow-brand-red/20 group-hover:scale-110 transition-transform">
-            <Film className="w-6 h-6 text-white" />
+            <Film className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl md:text-2xl font-bold tracking-tighter">
+          <span className="text-xl font-bold tracking-tighter uppercase">
             CineMood<span className="text-brand-red">AI</span>
           </span>
         </Link>

@@ -41,11 +41,21 @@ body {
 }
 
 .red-glow {
-  box-shadow: 0 0 20px rgba(229, 9, 20, 0.3);
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.2);
 }
 
 .hero-gradient {
-  background: radial-gradient(circle at 50% 50%, rgba(229, 9, 20, 0.15) 0%, transparent 80%);
+  background: radial-gradient(circle at 50% 50%, rgba(229, 9, 20, 0.08) 0%, transparent 80%);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite;
 }
 
 .text-shadow-glow {
