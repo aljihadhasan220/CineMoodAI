@@ -29,10 +29,9 @@ async function startServer() {
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Recommend 6 movies based on the user request: "${prompt}". 
-        For each movie, provide the title, why it matches, and a short description.
-        Return the result in JSON format.`,
+        contents: `Recommendations for: "${prompt}"`,
         config: {
+          systemInstruction: "You are CineMoodAI, an expert movie recommendation engine. Based on the user's mood or request, suggest 6 highly relevant movies. For each movie, provide the title, why it specifically matches their mood (the 'reason'), and a concise plot description. Also provide an 'overallReason' summarizing why these movies were chosen. Always return valid JSON.",
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -56,10 +55,28 @@ async function startServer() {
         }
       });
 
-      res.json(JSON.parse(response.text || "{}"));
+      const text = response.text;
+      if (!text) throw new Error("Empty AI response");
+      
+      const parsed = JSON.parse(text);
+      res.json(parsed);
     } catch (error: any) {
       console.error("AI Error:", error);
-      res.status(500).json({ error: "Failed to generate recommendations" });
+      
+      // Fallback Recommendations
+      const fallbacks = {
+        overallReason: "Thinking of some timeless classics while the AI takes a moment to process your specific mood.",
+        recommendations: [
+          { title: "The Shawshank Redemption", reason: "Universally acclaimed for its message of hope and resilience.", description: "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency." },
+          { title: "Inception", reason: "Perfect for those seeking an intellectual and visual thrill.", description: "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea." },
+          { title: "Parasite", reason: "A masterpiece of social commentary and suspense.", description: "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan." },
+          { title: "Spirited Away", reason: "Wonderful for a sense of wonder and magical escapism.", description: "During her family's move to the suburbs, a sullen 10-year-old girl wanders into a world ruled by gods, witches, and spirits." },
+          { title: "The Dark Knight", reason: "Ideal for a high-intensity, gritty cinematic experience.", description: "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability." },
+          { title: "La La Land", reason: "A beautiful choice for music, romance, and artistic passion.", description: "While navigating their careers in Los Angeles, a pianist and an actress fall in love while attempting to reconcile their aspirations for the future." }
+        ]
+      };
+      
+      res.json(fallbacks);
     }
   });
 
