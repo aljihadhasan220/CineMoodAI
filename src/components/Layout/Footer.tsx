@@ -27,22 +27,22 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold mb-6">Explore</h4>
-            <ul className="space-y-4 text-sm text-white/50">
-              <li><Link to="/trending" className="hover:text-brand-red transition-colors">Trending Movies</Link></li>
-              <li><Link to="/ai-search" className="hover:text-brand-red transition-colors">AI Search</Link></li>
-              <li><Link to="/watchlist" className="hover:text-brand-red transition-colors">Personal Watchlist</Link></li>
-              <li><Link to="/categories" className="hover:text-brand-red transition-colors">Categories</Link></li>
+            <h4 className="font-bold mb-6 italic uppercase tracking-widest text-[10px] text-white/30">Explore</h4>
+            <ul className="space-y-4 text-sm text-white/50 font-medium">
+              <li><Link to="/" className="hover:text-brand-red transition-colors flex items-center gap-2">Trending Movies</Link></li>
+              <li><Link to="/ai-search" className="hover:text-brand-red transition-colors flex items-center gap-2">AI Search</Link></li>
+              <li><Link to="/watchlist" className="hover:text-brand-red transition-colors flex items-center gap-2">Personal Watchlist</Link></li>
+              <li><Link to="/categories" className="hover:text-brand-red transition-colors flex items-center gap-2">Movie categories</Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-bold mb-6">Support</h4>
-            <ul className="space-y-4 text-sm text-white/50">
-              <li><Link to="/about" className="hover:text-brand-red transition-colors">About CineMoodAI</Link></li>
-              <li><Link to="/contact" className="hover:text-brand-red transition-colors">Contact Us</Link></li>
-              <li><Link to="/privacy" className="hover:text-brand-red transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/terms" className="hover:text-brand-red transition-colors">Terms of Service</Link></li>
+            <h4 className="font-bold mb-6 italic uppercase tracking-widest text-[10px] text-white/30">Support</h4>
+            <ul className="space-y-4 text-sm text-white/50 font-medium">
+              <li><Link to="/about" className="hover:text-brand-red transition-colors flex items-center gap-2">About CineMoodAI</Link></li>
+              <li><Link to="/contact" className="hover:text-brand-red transition-colors flex items-center gap-2">Contact Us</Link></li>
+              <li><Link to="/privacy" className="hover:text-brand-red transition-colors flex items-center gap-2">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-brand-red transition-colors flex items-center gap-2">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -50,11 +50,16 @@ export default function Footer() {
             <h4 className="font-bold mb-6">Community</h4>
             <div className="bg-white/5 rounded-2xl p-6 border border-white/5">
               <p className="text-xs text-white/40 mb-4 uppercase tracking-widest font-bold">Join our Telegram</p>
-              <p className="text-sm mb-6">Get daily movie picks and discuss with fellow cinephiles.</p>
-              <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
+              <p className="text-sm mb-6 text-white/60 font-medium">Get daily movie picks and discuss with fellow cinephiles.</p>
+              <a 
+                href="https://t.me/moviewalla02" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+              >
                 <MessageCircle className="w-4 h-4 fill-white" />
                 Join Telegram
-              </button>
+              </a>
             </div>
           </div>
         </div>

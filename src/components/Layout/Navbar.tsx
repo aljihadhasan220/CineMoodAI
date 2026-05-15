@@ -18,7 +18,7 @@ export default function Navbar() {
   const navLinks = [
     { name: "Home", path: "/", icon: Film },
     { name: "AI recommendations", path: "/ai-search", icon: Search },
-    { name: "Trending", path: "/trending", icon: TrendingUp },
+    { name: "Categories", path: "/categories", icon: TrendingUp },
     { name: "Watchlist", path: "/watchlist", icon: Heart },
   ];
 
@@ -39,6 +39,23 @@ export default function Navbar() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
+          <form className="relative group" onSubmit={(e) => {
+            e.preventDefault();
+            const q = (e.currentTarget.elements.namedItem("search") as HTMLInputElement).value;
+            if (q) {
+              window.location.href = `/ai-search?q=${encodeURIComponent(q)}`;
+            }
+          }}>
+            <input 
+              name="search"
+              type="text"
+              placeholder="Search movies or moods..."
+              className="bg-white/5 border border-white/10 rounded-full px-5 py-2 text-xs focus:ring-1 focus:ring-brand-red outline-none transition-all w-48 focus:w-64"
+            />
+            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+              <Search className="w-3.5 h-3.5" />
+            </button>
+          </form>
           {navLinks.map((link) => (
             <Link
               key={link.path}
@@ -51,8 +68,8 @@ export default function Navbar() {
               {link.name}
             </Link>
           ))}
-          <button className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors">
-            <User className="w-5 h-5" />
+          <button className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors flex items-center justify-center">
+            <User className="w-4 h-4" />
           </button>
         </div>
 

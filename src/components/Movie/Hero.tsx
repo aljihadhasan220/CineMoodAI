@@ -16,12 +16,15 @@ export default function Hero() {
 
   return (
     <div className="relative h-[80vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden">
-      {/* Clean Cinematic Background */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/80 to-black" />
-        <img 
-          src="https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?q=80&w=2000" 
-          className="w-full h-full object-cover opacity-30 animate-pulse-slow"
+      {/* Premium Cinematic Background */}
+      <div className="absolute inset-0 -z-10 bg-black">
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20 z-10" />
+        <motion.img 
+          initial={{ scale: 1.1, opacity: 0 }}
+          animate={{ scale: 1, opacity: 0.4 }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+          src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=2000" 
+          className="w-full h-full object-cover grayscale"
           alt="Hero background"
         />
       </div>
@@ -35,16 +38,16 @@ export default function Hero() {
         <span className="text-brand-red font-bold tracking-[0.3em] uppercase text-[10px] mb-4 block">
           AI-Powered Discovery
         </span>
-        <h1 className="text-5xl md:text-8xl font-black mb-8 tracking-tighter leading-none">
-          Your Next Favorite <br />
-          <span className="text-white/90">Movie Awaits</span>
+        <h1 className="text-5xl md:text-8xl font-black mb-8 tracking-tighter leading-none uppercase">
+          Find Your Next <br />
+          <span className="text-white/90 italic">Cinema Obsession</span>
         </h1>
         
         <p className="text-white/40 text-base md:text-lg max-w-xl mx-auto mb-10 font-medium leading-relaxed">
           The most intelligent way to find films that match your exact mood and taste.
         </p>
 
-        {/* Minimal Search Bar */}
+        {/* Search Bar */}
         <form 
           onSubmit={handleSearch}
           className="relative max-w-2xl mx-auto w-full group"
@@ -65,7 +68,7 @@ export default function Hero() {
               className="bg-brand-red hover:bg-red-700 text-white px-8 py-4 rounded-xl flex items-center gap-2 transition-all font-bold shadow-lg shadow-brand-red/20 active:scale-95"
             >
               <Sparkles className="w-4 h-4" />
-              <span className="hidden md:inline">Ask AI</span>
+              <span className="hidden md:inline">ASK AI</span>
             </button>
           </div>
         </form>
