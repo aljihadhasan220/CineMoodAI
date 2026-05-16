@@ -175,28 +175,43 @@ export default function MovieDetails() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-4 mb-16">
+            <div className="flex flex-col sm:flex-row flex-wrap items-center gap-4 mb-16">
               {trailer && (
-                <a 
+                <motion.a 
+                  whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(229, 9, 20, 0.4)" }}
+                  whileTap={{ scale: 0.95 }}
                   href={`https://www.youtube.com/watch?v=${trailer.key}`} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="bg-brand-red hover:bg-red-700 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-3 shadow-xl shadow-brand-red/30 transition-all hover:scale-105 active:scale-95 group"
+                  className="bg-brand-red text-white px-10 h-16 rounded-2xl font-black flex items-center justify-center gap-3 shadow-2xl shadow-brand-red/30 transition-all group w-full sm:w-auto min-w-[240px] uppercase tracking-[0.1em] text-sm"
                 >
-                  <Play className="w-6 h-6 fill-white" />
+                  <Play className="w-5 h-5 fill-white" />
                   WATCH TRAILER
-                </a>
+                </motion.a>
               )}
-              <button 
+              
+              <motion.button 
+                whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                whileTap={{ scale: 0.95 }}
                 onClick={toggleWatchlist}
                 className={cn(
-                  "glass px-8 py-4 rounded-2xl font-bold flex items-center gap-3 border transition-all",
-                  inWatchlist ? "bg-brand-red/10 border-brand-red/50 text-brand-red" : "hover:bg-white/10 border-white/10"
+                  "px-8 h-16 rounded-2xl font-black flex items-center justify-center gap-3 border backdrop-blur-md transition-all uppercase tracking-[0.1em] text-sm w-full sm:w-auto min-w-[180px]",
+                  inWatchlist 
+                    ? "bg-brand-red/20 border-brand-red/40 text-brand-red shadow-lg shadow-brand-red/10" 
+                    : "bg-white/5 border-white/10 text-white"
                 )}
               >
-                {inWatchlist ? <Star className="w-6 h-6 fill-brand-red" /> : <Plus className="w-6 h-6" />}
+                {inWatchlist ? <Star className="w-5 h-5 fill-brand-red" /> : <Plus className="w-5 h-5" />}
                 {inWatchlist ? "SAVED" : "WATCHLIST"}
-              </button>
+              </motion.button>
+              
+              <motion.button 
+                whileHover={{ scale: 1.05, backgroundColor: "rgba(124, 58, 237, 0.2)", borderColor: "rgba(124, 58, 237, 0.4)" }}
+                whileTap={{ scale: 0.95 }}
+                className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 text-white flex items-center justify-center backdrop-blur-md transition-all group hidden sm:flex"
+              >
+                <Share2 className="w-5 h-5 group-hover:text-brand-red transition-colors" />
+              </motion.button>
             </div>
 
             {/* Cast / Meta Section */}

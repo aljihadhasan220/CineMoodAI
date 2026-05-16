@@ -110,25 +110,38 @@ export default function MovieCard({ movie, index = 0 }: MovieCardProps) {
             )}
 
             <div className="flex gap-2">
-              <div className="flex-1 bg-white text-black py-2.5 rounded-lg flex items-center justify-center gap-2 text-[10px] font-black tracking-widest uppercase shadow-lg">
-                <Play className="w-3 h-3 fill-current" />
-                PLAY
-              </div>
-              <button 
+              <motion.div 
+                whileHover={{ scale: 1.05, backgroundColor: "rgb(229, 9, 20)", color: "white" }}
+                whileTap={{ scale: 0.95 }}
+                className="flex-1 bg-white text-black py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black tracking-widest uppercase shadow-xl transition-colors"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                DETAILS
+              </motion.div>
+              <motion.button 
+                whileHover={{ scale: 1.1, backgroundColor: "rgba(229, 9, 20, 0.2)", borderColor: "rgb(229, 9, 20)" }}
+                whileTap={{ scale: 0.9 }}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   const saved = localStorage.getItem("cinemood_watchlist");
                   const current = saved ? JSON.parse(saved) : [];
                   if (!current.find((m: any) => m.id === movie.id)) {
-                    const updated = [...current, movie];
+                    const updated = [...current, {
+                      id: movie.id,
+                      title: movie.title,
+                      poster_path: movie.poster_path,
+                      vote_average: movie.vote_average,
+                      release_date: movie.release_date
+                    }];
                     localStorage.setItem("cinemood_watchlist", JSON.stringify(updated));
+                    // Optional: trigger a custom event or toast
                   }
                 }}
-                className="w-10 h-10 bg-white/10 hover:bg-brand-red rounded-lg flex items-center justify-center transition-all border border-white/10"
+                className="w-12 h-12 bg-black/40 backdrop-blur-md hover:text-white rounded-xl flex items-center justify-center transition-all border border-white/10"
               >
-                <Plus className="w-4 h-4" />
-              </button>
+                <Plus className="w-5 h-5 text-brand-red" />
+              </motion.button>
             </div>
           </div>
         </div>

@@ -43,7 +43,7 @@ export default function AISearch() {
   const query = searchParams.get("q") || "";
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [result, setResult] = useState<{ recommendations: AIRecommendation[], overallReason: string, isFallback?: boolean } | null>(null);
+  const [result, setResult] = useState<{ recommendations: AIRecommendation[], overallReason: string, isFallback?: boolean, isAIEnhanced?: boolean } | null>(null);
   const [searchInput, setSearchInput] = useState(query);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -107,7 +107,7 @@ export default function AISearch() {
 
     const timer = setTimeout(() => {
       getRecommendations();
-    }, 300);
+    }, 500); // 500ms debounce to conserve Gemini quota
 
     return () => {
       clearTimeout(timer);
@@ -221,10 +221,15 @@ export default function AISearch() {
                       <Sparkles className="w-4 h-4" />
                       AI Analysis
                     </h2>
-                    {result.isFallback && (
-                      <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-white/30 bg-white/5 px-2 py-1 rounded-full border border-white/5">
-                        <Check className="w-2 h-2" />
-                        CineMood Core High Performance Search
+                    {result.isAIEnhanced ? (
+                      <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-brand-red bg-brand-red/10 px-2.5 py-1 rounded-full border border-brand-red/20 shadow-lg shadow-brand-red/10">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        Live AI Enrichment Active
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-white/30 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
+                        <Clock className="w-2.5 h-2.5" />
+                        AI insights temporarily limited. Showing cinematic results.
                       </div>
                     )}
                   </div>
@@ -255,11 +260,17 @@ export default function AISearch() {
                   animate={{ opacity: 1 }}
                   className="col-span-full py-24 text-center glass rounded-3xl border border-dashed border-white/10"
                 >
-                  <Sparkles className="w-12 h-12 text-white/10 mx-auto mb-4" />
-                  <p className="text-white/40 text-lg">No specific recommendations found. Try a different mood or keyword.</p>
+                  <Search className="w-12 h-12 text-white/10 mx-auto mb-4" />
+                  <p className="text-white/40 text-lg">No matches found for your criteria. Try another cinematic keyword.</p>
                 </motion.div>
               )}
             </div>
+            
+            {result?.recommendations && result.recommendations.length > 15 && (
+              <div className="py-12 border-t border-white/5 text-center">
+                <p className="text-white/20 text-xs font-black uppercase tracking-[0.2em]">End of Curated Selection</p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -267,7 +278,7 @@ export default function AISearch() {
   );
 }
 
-function RecommendationCard({ rec, index }: RecommendationCardProps) {
+const RecommendationCard = React.memo(({ rec, index }: RecommendationCardProps) => {
   const [imgError, setImgError] = useState(false);
   const [inWatchlist, setInWatchlist] = useState(false);
   const navigate = useNavigate();
@@ -311,7 +322,7 @@ function RecommendationCard({ rec, index }: RecommendationCardProps) {
     ? rec.omdb.imdbRating 
     : (rec.vote_average ? rec.vote_average.toFixed(1) : null);
 
-  const genres = rec.genres?.slice(0, 3).join(" • ");
+  const genres = rec.genres?.slice(0, 3);
   const runtime = rec.runtime || (rec.omdb?.runtime ? parseInt(rec.omdb.runtime) : null);
 
   return (
@@ -329,6 +340,7 @@ function RecommendationCard({ rec, index }: RecommendationCardProps) {
             src={imageUrl} 
             alt={rec.title}
             onError={() => setImgError(true)}
+            loading="lazy"
             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-black/40" />
@@ -337,7 +349,7 @@ function RecommendationCard({ rec, index }: RecommendationCardProps) {
             <div className="absolute top-6 left-6 z-20">
               <div className="bg-brand-red text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-xl shadow-brand-red/40 uppercase tracking-[0.2em] flex items-center gap-2 backdrop-blur-md">
                 <Sparkles className="w-3 h-3" />
-                {rec.matchScore}% AI Match
+                {rec.matchScore}% Match
               </div>
             </div>
           )}
@@ -347,7 +359,7 @@ function RecommendationCard({ rec, index }: RecommendationCardProps) {
               <div className="bg-black/60 backdrop-blur-xl border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <Star className="w-4 h-4 text-brand-red fill-brand-red" />
                 <span className="text-sm font-black">{mainRating}</span>
-                <span className="text-[8px] font-black text-yellow-500 uppercase tracking-widest border-l border-white/20 pl-2">IMDb</span>
+                <span className="text-[8px] font-black text-yellow-500 uppercase tracking-widest border-l border-white/20 pl-2">Rating</span>
               </div>
             </div>
           )}
@@ -365,27 +377,31 @@ function RecommendationCard({ rec, index }: RecommendationCardProps) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-8 text-[10px] md:text-sm font-bold uppercase tracking-[0.1em] text-white/60">
-              {genres && <span className="flex items-center gap-2 flex-shrink-0">{genres}</span>}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-8">
+              {genres && genres.map((g, idx) => (
+                <span key={idx} className="text-[10px] font-black uppercase tracking-widest text-brand-red/80 bg-brand-red/5 px-2 py-1 rounded border border-brand-red/10">
+                  {g}
+                </span>
+              ))}
               {runtime && (
-                <span className="flex items-center gap-2 flex-shrink-0">
+                <span className="flex items-center gap-2 text-white/40 text-[10px] font-black border-l border-white/10 pl-4 uppercase tracking-widest">
                   <Clock className="w-4 h-4 text-brand-red" />
                   {runtime} MIN
                 </span>
               )}
-              {rec.director && (
-                <span className="flex items-center gap-2 flex-shrink-0">
-                  <UserIcon className="w-4 h-4 text-brand-red" />
-                  DIR: {rec.director}
+              {rec.streaming && rec.streaming.length > 0 && (
+                <span className="flex items-center gap-2 text-green-400/80 text-[10px] font-black border-l border-white/10 pl-4 uppercase tracking-widest">
+                  <Play className="w-3.5 h-3.5" />
+                  STREAMING AVAILABLE
                 </span>
               )}
             </div>
 
-            <div className="bg-brand-red/5 border border-brand-red/10 rounded-2xl p-6 mb-8 relative">
-              <div className="absolute top-0 left-0 w-1 h-full bg-brand-red" />
+            <div className="bg-brand-red/5 border border-brand-red/10 rounded-2xl p-6 mb-8 relative group/reason">
+              <div className="absolute top-0 left-0 w-1 h-full bg-brand-red/40 group-hover/reason:bg-brand-red transition-colors" />
               <h4 className="text-[10px] font-black text-brand-red uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5" />
-                Why This Matches Your Mood
+                Thematic Connection
               </h4>
               <p className="text-white/90 italic font-serif text-lg leading-relaxed">
                 "{rec.reason}"
@@ -398,63 +414,91 @@ function RecommendationCard({ rec, index }: RecommendationCardProps) {
 
             {rec.cast && (
               <div className="mb-8">
-                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-3">Starring</p>
+                <p className="text-[10px] font-black text-white/10 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                   <UserIcon className="w-3 h-3" />
+                   Featured Cast
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {rec.cast.map((actor, idx) => (
-                    <span key={idx} className="text-xs font-bold px-3 py-1 bg-white/5 rounded-full text-white/60">{actor}</span>
+                    <span key={idx} className="text-[10px] font-bold px-3 py-1.5 bg-white/[0.03] hover:bg-brand-red/20 border border-white/5 hover:border-brand-red/30 rounded-lg text-white/50 hover:text-white transition-all cursor-default">
+                      {actor}
+                    </span>
                   ))}
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <button 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+            <motion.button 
+              whileHover={{ scale: 1.02, backgroundColor: "rgb(229, 9, 20)", boxShadow: "0 0 25px rgba(229, 9, 20, 0.4)" }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => rec.id && navigate(`/movie/${rec.id}`)}
-              className="px-8 h-14 bg-white text-black hover:bg-brand-red hover:text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-3 active:scale-95 flex-1 shadow-2xl"
+              className="px-6 h-14 md:h-16 bg-white text-black hover:text-white rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 shadow-2xl backdrop-blur-md border border-white/20"
             >
-              <Info className="w-4 h-4" />
+              <Info className="w-4 h-4 md:w-5 md:h-5" />
               DETAILS
-            </button>
+            </motion.button>
             
-            {rec.trailer && (
-              <a 
-                href={`https://www.youtube.com/watch?v=${rec.trailer}`}
+            {(rec.streaming && rec.streaming.length > 0) ? (
+              <motion.a 
+                whileHover={{ scale: 1.02, backgroundColor: "rgba(34, 197, 94, 0.2)", boxShadow: "0 0 25px rgba(34, 197, 94, 0.3)" }}
+                whileTap={{ scale: 0.98 }}
+                href={rec.streaming[0].url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-8 h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-3 active:scale-95 flex-1"
+                className="px-6 h-14 md:h-16 bg-green-500/10 text-green-500 border border-green-500/30 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 backdrop-blur-md transition-all"
               >
-                <Play className="w-4 h-4" />
-                TRAILER
-              </a>
+                <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
+                WATCH NOW
+              </motion.a>
+            ) : (
+              rec.trailer && (
+                <motion.a 
+                  whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.15)", boxShadow: "0 0 20px rgba(255, 255, 255, 0.1)" }}
+                  whileTap={{ scale: 0.98 }}
+                  href={`https://www.youtube.com/watch?v=${rec.trailer}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 h-14 md:h-16 bg-white/5 border border-white/10 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 backdrop-blur-md text-white md:text-white/80 md:hover:text-white"
+                >
+                  <Play className="w-4 h-4 md:w-5 md:h-5" />
+                  TRAILER
+                </motion.a>
+              )
             )}
 
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.1)", borderColor: "rgba(229, 9, 20, 0.5)", boxShadow: "0 0 20px rgba(229, 9, 20, 0.2)" }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => {
-                setSearchParams({ q: `Movies like ${rec.title}` });
+                setSearchParams({ q: `More movies like ${rec.title}` });
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className="px-8 h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-3 active:scale-95 flex-1"
+              className="px-6 h-14 md:h-16 bg-white/5 border border-white/10 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 backdrop-blur-md text-white md:text-white/80 md:hover:text-white"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-brand-red" />
               SIMILAR
-            </button>
+            </motion.button>
 
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.02, backgroundColor: inWatchlist ? "rgba(229, 9, 20, 0.3)" : "rgba(255, 255, 255, 0.1)" }}
+              whileTap={{ scale: 0.98 }}
               onClick={toggleWatchlist}
               className={cn(
-                "w-14 h-14 flex items-center justify-center rounded-2xl border transition-all active:scale-95",
+                "px-6 h-14 md:h-16 flex items-center justify-center rounded-2xl border transition-all backdrop-blur-md font-black text-[10px] md:text-xs uppercase tracking-[0.2em] gap-3",
                 inWatchlist 
-                  ? "bg-brand-red/20 border-brand-red/40 text-brand-red" 
-                  : "bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                  ? "bg-brand-red/20 border-brand-red/40 text-brand-red shadow-[0_0_15px_rgba(229,9,20,0.2)]" 
+                  : "bg-white/5 border-white/10 text-white md:text-white/60 md:hover:text-white"
               )}
             >
-              {inWatchlist ? <Check className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
-            </button>
+              {inWatchlist ? <Check className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" /> : <Plus className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />}
+              {inWatchlist ? "SAVED" : "LIST"}
+            </motion.button>
           </div>
         </div>
       </div>
     </motion.div>
   );
-}
+});
 

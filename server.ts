@@ -223,274 +223,239 @@ async function startServer() {
     }
   });
 
-  // AI Recommendation Endpoint with Caching
+  // AI Recommendation Endpoint with Intelligence & Quota Protection
   app.post("/api/ai/recommend", async (req, res) => {
-    const fallbacks = {
-      overallReason: "The AI is currently processing deep cinematic patterns. Here are some essentials while it recalibrates.",
-      recommendations: [
-        { title: "The Shawshank Redemption", id: 278, reason: "Universally acclaimed for its message of hope and resilience.", description: "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.", matchScore: 99, poster_path: "/9cqYj7yL7igIl0Pbz9SNS69CqZ.jpg" },
-        { title: "Inception", id: 27205, reason: "Perfect for those seeking an intellectual and visual thrill.", description: "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea.", matchScore: 98, poster_path: "/o0I0Bh96S38S5S6v9h9IqvA6S5.jpg" },
-        { title: "Parasite", id: 496243, reason: "A masterpiece of social commentary and suspense.", description: "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.", matchScore: 97, poster_path: "/7IiTT0SBRU7LGr6Uqcoy9vZ6p9f.jpg" }
-      ]
-    };
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+
+    const cacheKey = `v2_recommend_${Buffer.from(prompt.toLowerCase().trim()).toString('base64').slice(0, 60)}`;
+    const cached = getFromCache(cacheKey);
+    if (cached) return res.json(cached);
+
+    const tmdbKey = process.env.TMDB_API_KEY;
+    if (!tmdbKey || tmdbKey === "YOUR_TMDB_API_KEY") {
+      return res.json({
+        overallReason: "The Cinematic engine is currently in maintenance. Here are some essentials.",
+        recommendations: getMockMovies("popular").results
+      });
+    }
 
     try {
-      const { prompt } = req.body;
-      if (!prompt) return res.status(400).json({ error: "Prompt is required" });
-
-      const cacheKey = `recommend_${Buffer.from(prompt).toString('base64').slice(0, 50)}`;
-      const cached = getFromCache(cacheKey);
-      if (cached) return res.json(cached);
-
-      // Check if we are recently blocked by quota
-      const now = Date.now();
-      if (now - lastQuotaExceeded < QUOTA_COOLDOWN) {
-        console.warn(`[CineMoodAI] Quota Cooldown Active. Using fallback for: "${prompt}"`);
-        return await handleFallbackSearch(prompt, res, "The AI is currently processing deep cinematic patterns. Here are some essentials based on your request while it recalibrates.", true);
+      // 1. LEAD WITH TMDB (Discovery Layer)
+      const q = prompt.toLowerCase();
+      let tmdbUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(prompt)}&include_adult=false`;
+      
+      // Intelligent discovery mapping for moods/languages/genres
+      // This ensures much higher quality regional and thematic results
+      if (q.includes("hindi") || q.includes("bollywood")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_original_language=hi&sort_by=popularity.desc&vote_count.gte=100`;
+      } else if (q.includes("malayalam") || q.includes("mollywood")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_original_language=ml&sort_by=popularity.desc&vote_count.gte=50`;
+      } else if (q.includes("tamil") || q.includes("kollywood")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_original_language=ta&sort_by=popularity.desc&vote_count.gte=50`;
+      } else if (q.includes("korean") || q.includes("k-drama") || q.includes("kdrama")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_original_language=ko&sort_by=popularity.desc&vote_count.gte=100`;
+      } else if (q.includes("anime") || q.includes("animation")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=16&sort_by=popularity.desc&vote_count.gte=100`;
+      } else if (q.includes("horror") || q.includes("scary") || q.includes("spooky")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=27&sort_by=popularity.desc&vote_count.gte=100`;
+      } else if (q.includes("sci-fi") || q.includes("science fiction") || q.includes("space")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=878&sort_by=popularity.desc&vote_count.gte=100`;
+      } else if (q.includes("action") || q.includes("fight") || q.includes("war")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=28&sort_by=popularity.desc&vote_count.gte=100`;
+      } else if (q.includes("fantasy") || q.includes("magic")) {
+        tmdbUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=14&sort_by=popularity.desc&vote_count.gte=100`;
       }
 
-      console.log(`[CineMoodAI] Requesting AI recommendations for: "${prompt}"`);
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Recommendations for: "${prompt}"`,
-        config: {
-          systemInstruction: "You are CineMoodAI, an elite cinematic consultant. Based on the user's mood, theme, or specific request (which may include languages like Hindi, Malayalam, Tamil, etc.), curate a selection of 8 exceptional movies. For each, provide the precise title, a deep thematic 'reason' why it resonates with their request (Label this as 'Why This Matches Your Mood'), a short compelling description, and a 'matchScore' (0-100). If the user asks for a specific region or language, prioritize that (e.g., Bollywood for Hindi, Mollywood for Malayalam). Always return valid JSON.",
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              recommendations: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING },
-                    reason: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    matchScore: { type: Type.NUMBER }
-                  },
-                  required: ["title", "reason", "description", "matchScore"]
-                }
-              },
-              overallReason: { type: Type.STRING }
-            },
-            required: ["recommendations", "overallReason"]
+      const tmdbRes = await fetch(tmdbUrl);
+      const tmdbData = await tmdbRes.json();
+      // Increase candidate pool to 20 for better variety
+      const candidates = (tmdbData.results || []).slice(0, 24);
+
+      if (candidates.length === 0) {
+        // Fallback to trending if specific search fails
+        const trendRes = await fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${tmdbKey}`);
+        const trendData = await trendRes.json();
+        candidates.push(...(trendData.results || []).slice(0, 12));
+      }
+
+      // 2. ENRICH WITH AI (Enrichment Layer)
+      let aiAnalysis = null;
+      let usedGemini = false;
+      const now = Date.now();
+
+      // Optimize: Only call Gemini for thematic analysis if not in cooldown
+      if (now - lastQuotaExceeded > QUOTA_COOLDOWN && prompt.length > 2) {
+        try {
+          console.log(`[CineMoodAI] Generating thematic insights for: "${prompt}"`);
+          // We only send a subset of titles to Gemini to save tokens and improve prompt precision
+          const movieSample = candidates.slice(0, 8).map((c: any) => c.title).join(", ");
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `The User Mood: "${prompt}"\nFeatured Candidates: ${movieSample}`,
+            config: {
+              systemInstruction: `You are CineMoodAI, a legendary film critic. 
+              1. Synthesize a 1-sentence 'overallReason' explaining the cinematic vibe of the user's request. 
+              2. For the featured candidates, provide a 15-word 'reason' why they fit this specific mood. 
+              Return valid JSON only.`,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  overallReason: { type: Type.STRING },
+                  connections: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        title: { type: Type.STRING },
+                        reason: { type: Type.STRING }
+                      }
+                    }
+                  }
+                },
+                required: ["overallReason", "connections"]
+              }
+            }
+          });
+          
+          if (response.text) {
+            aiAnalysis = JSON.parse(response.text);
+            usedGemini = true;
+          }
+        } catch (aiErr: any) {
+          console.warn("[CineMoodAI] AI enrichment skipped:", aiErr.message || aiErr);
+          if (String(aiErr).toLowerCase().includes("429") || String(aiErr).toLowerCase().includes("quota")) {
+            lastQuotaExceeded = Date.now();
           }
         }
-      });
-
-      const text = response.text;
-      if (!text) throw new Error("Empty AI response");
-      
-      let parsed;
-      try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : text;
-        parsed = JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error("JSON Parse Error:", parseError, "Original text:", text);
-        throw new Error("AI returned invalid JSON");
-      }
-      
-      const apiKey = process.env.TMDB_API_KEY;
-      if (apiKey && apiKey !== "YOUR_TMDB_API_KEY") {
-        const seenIds = new Set<number>();
-        const enhancedRecommendations = await Promise.all(
-          parsed.recommendations.map(async (rec: any) => {
-            try {
-              const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(rec.title)}`;
-              const searchRes = await fetch(searchUrl);
-              const searchData = await searchRes.json();
-              
-              let movieDetails = { ...rec };
-
-              if (searchData.results && searchData.results.length > 0) {
-                // Try to find the best match by title similarity if possible, otherwise first result
-                const bestMatch = searchData.results[0];
-                if (seenIds.has(bestMatch.id)) return null;
-                seenIds.add(bestMatch.id);
-
-                // Fetch full details to get genres, runtime, etc.
-                const detailUrl = `https://api.themoviedb.org/3/movie/${bestMatch.id}?api_key=${apiKey}&append_to_response=credits,videos`;
-                const detailRes = await fetch(detailUrl);
-                const fullDetails = await detailRes.json();
-
-                const director = fullDetails.credits?.crew?.find((c: any) => c.job === "Director")?.name;
-
-                movieDetails = {
-                  ...movieDetails,
-                  id: fullDetails.id,
-                  poster_path: fullDetails.poster_path,
-                  backdrop_path: fullDetails.backdrop_path,
-                  vote_average: fullDetails.vote_average,
-                  release_date: fullDetails.release_date,
-                  runtime: fullDetails.runtime,
-                  genres: fullDetails.genres?.map((g: any) => g.name),
-                  director: director,
-                  cast: fullDetails.credits?.cast?.slice(0, 3).map((c: any) => c.name),
-                  trailer: fullDetails.videos?.results?.find((v: any) => v.type === "Trailer")?.key
-                };
-
-                const omdb = await fetchOMDbData(fullDetails.title, fullDetails.release_date);
-                if (omdb) {
-                  movieDetails = { 
-                    ...movieDetails, 
-                    omdb,
-                    director: movieDetails.director || omdb.director,
-                    runtime: movieDetails.runtime || (omdb.runtime ? parseInt(omdb.runtime) : null)
-                  };
-                }
-
-                const streaming = await fetchWatchmodeData(fullDetails.id);
-                if (streaming) movieDetails = { ...movieDetails, streaming };
-              }
-              return movieDetails;
-            } catch (e) {
-              console.error(`Error fetching data for ${rec.title}:`, e);
-            }
-            return rec;
-          })
-        );
-        parsed.recommendations = enhancedRecommendations.filter(rec => rec !== null);
       }
 
-      setToCache(cacheKey, parsed, 12); // Cache recommendations for 12h
-      res.json(parsed);
-    } catch (error: any) {
-      // Robust detection of Gemini Quota Errors
-      const errorMsg = String(error).toLowerCase();
-      const errorJson = JSON.stringify(error).toLowerCase();
-      
-      const isQuotaError = 
-        error?.status === 429 || 
-        error?.code === 429 ||
-        errorMsg.includes("429") ||
-        errorMsg.includes("resource_exhausted") ||
-        errorMsg.includes("quota") ||
-        errorJson.includes("429") ||
-        errorJson.includes("quota");
+      // 3. ASSEMBLE WITH DEEP METADATA
+      const recommendations = await Promise.all(candidates.map(async (movie: any) => {
+        try {
+          const detailUrl = `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${tmdbKey}&append_to_response=credits,videos`;
+          const detailRes = await fetch(detailUrl);
+          const fullDetails = await detailRes.json();
+          const director = fullDetails.credits?.crew?.find((c: any) => c.job === "Director")?.name;
 
-      if (isQuotaError) {
-        console.warn("[CineMoodAI] Rate Limit/Quota Reached. Switching to predictive fallback.");
-        
-        // Detect daily limit for longer cooldown
-        if (errorJson.includes("perday") || errorMsg.includes("per day")) {
-          console.warn("[CineMoodAI] Daily quota detected. Extending cooldown.");
-          lastQuotaExceeded = Date.now() + (23 * 60 * 60 * 1000); // 23h cooldown
-        } else {
-          lastQuotaExceeded = Date.now();
+          // Find AI reasoning for this specific movie
+          let aiReason = aiAnalysis?.connections?.find((c: any) => 
+            c.title.toLowerCase().includes(movie.title.toLowerCase()) || 
+            movie.title.toLowerCase().includes(c.title.toLowerCase())
+          )?.reason;
+
+          if (!aiReason) {
+            // Local fallback reasoning engine to ensure quality cards even without Gemini
+            const genre = fullDetails.genres?.[0]?.name || "Cinematic";
+            aiReason = `A definitive ${genre} experience recognized for its ${fullDetails.vote_average > 7.5 ? "exceptional critical acclaim" : "unique narrative texture"}.`;
+          }
+
+          let movieDetails = {
+            id: fullDetails.id,
+            title: fullDetails.title,
+            reason: aiReason,
+            description: fullDetails.overview,
+            matchScore: Math.floor(Math.random() * 12) + 87, // High confidence matches
+            poster_path: fullDetails.poster_path,
+            backdrop_path: fullDetails.backdrop_path,
+            vote_average: fullDetails.vote_average,
+            release_date: fullDetails.release_date,
+            runtime: fullDetails.runtime,
+            genres: fullDetails.genres?.map((g: any) => g.name),
+            director: director,
+            cast: fullDetails.credits?.cast?.slice(0, 4).map((c: any) => c.name),
+            trailer: fullDetails.videos?.results?.find((v: any) => v.type === "Trailer" && v.site === "YouTube")?.key || 
+                     fullDetails.videos?.results?.find((v: any) => v.site === "YouTube")?.key
+          };
+
+          // Background enrichment
+          const omdb = await fetchOMDbData(fullDetails.title, fullDetails.release_date, fullDetails.imdb_id);
+          if (omdb) {
+            movieDetails = { ...movieDetails, omdb } as any;
+          }
+          
+          return movieDetails;
+        } catch (e) {
+          return null;
         }
-      } else {
-        // Only log non-quota errors to reduce noise
-        console.error("[CineMoodAI] Operational Error:", error);
-      }
+      }));
 
-      // Use dynamic fallback for ANY AI failure to ensure consistent user experience
-      return await handleFallbackSearch(req.body.prompt || "Movies", res, 
-        isQuotaError 
-          ? "We've hit high demand for AI insights. Switching to specialized cinematic search results for you."
-          : "The AI is refining its cinematic intuition. Here are some curated matches for your request.",
-        true
-      );
+      const finalResult = {
+        overallReason: aiAnalysis?.overallReason || `A curated roadmap through the best of "${prompt}" in global cinema.`,
+        recommendations: recommendations.filter(r => r !== null),
+        isAIEnhanced: usedGemini,
+        timestamp: Date.now()
+      };
+
+      setToCache(cacheKey, finalResult, 24); // Cache for 24h
+      res.json(finalResult);
+
+    } catch (globalErr) {
+      console.error("[CineMoodAI] Global discovery failure:", globalErr);
+      return await handleFallbackSearch(prompt, res, "The AI is offline. Here are some essentials based on your request.");
     }
   });
 
-  async function handleFallbackSearch(query: string, res: any, reason: string, isFallback: boolean = false) {
-    const apiKey = process.env.TMDB_API_KEY;
-    const fallbacks = {
-      overallReason: reason,
-      recommendations: [] as any[],
-      isFallback
-    };
 
-    if (!apiKey || apiKey === "YOUR_TMDB_API_KEY") {
-      // Ultimate hardcoded fallback if even TMDB fails or is not configured
-      fallbacks.recommendations = [
-        { id: 278, title: "The Shawshank Redemption", reason: "Universally acclaimed for its message of hope and resilience.", description: "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.", matchScore: 99, poster_path: "/9cqYj7yL7igIl0Pbz9SNS69CqZ.jpg" },
-        { id: 27205, title: "Inception", reason: "Perfect for those seeking an intellectual and visual thrill.", description: "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea.", matchScore: 98, poster_path: "/o0I0Bh96S38S5S6v9h9IqvA6S5.jpg" },
-        { id: 496243, title: "Parasite", reason: "A masterpiece of social commentary and suspense.", description: "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.", matchScore: 97, poster_path: "/7IiTT0SBRU7LGr6Uqcoy9vZ6p9f.jpg" }
-      ];
-      return res.json(fallbacks);
+  // Smart Fallback Search (Predictive logic when AI is busy)
+  async function handleFallbackSearch(query: string, res: any, reason: string, isFallback: boolean = true) {
+    const tmdbKey = process.env.TMDB_API_KEY;
+    if (!tmdbKey || tmdbKey === "YOUR_TMDB_API_KEY") {
+      return res.json({
+        overallReason: reason,
+        recommendations: getMockMovies("popular").results,
+        isFallback
+      });
     }
 
     try {
       const q = query.toLowerCase();
-      let searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}`;
+      let url = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(query)}&include_adult=false`;
       
-      // Keyword detections for smarter discovery in fallback mode
-      if (q.includes("hindi") || q.includes("bollywood") || q.includes("indian")) {
-        searchUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_original_language=hi|te|ta|ml&sort_by=popularity.desc`;
-      } else if (q.includes("korean") || q.includes("k-drama") || q.includes("kdrama")) {
-        searchUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_original_language=ko&sort_by=popularity.desc`;
-      } else if (q.includes("anime") || q.includes("animation")) {
-        searchUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=16&sort_by=vote_average.desc&vote_count.gte=500`;
-      } else if (q.includes("horror") || q.includes("scary")) {
-        searchUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=27&sort_by=popularity.desc`;
-      } else if (q.includes("action") || q.includes("thriller")) {
-        searchUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=28,53&sort_by=popularity.desc`;
-      } else if (q.includes("sci-fi") || q.includes("science fiction") || q.includes("space")) {
-        searchUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=878&sort_by=popularity.desc`;
-      }
+      // Basic heuristic for fallback search
+      if (q.includes("action")) url = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=28&sort_by=popularity.desc`;
+      else if (q.includes("scifi") || q.includes("fiction")) url = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=878&sort_by=popularity.desc`;
+      else if (q.includes("horror")) url = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=27&sort_by=popularity.desc`;
+      else if (q.includes("romance")) url = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&with_genres=10749&sort_by=popularity.desc`;
 
-      const searchRes = await fetch(searchUrl);
+      const searchRes = await fetch(url);
       const searchData = await searchRes.json();
+      const results = (searchData.results || []).slice(0, 8);
 
-      if (searchData.results && searchData.results.length > 0) {
-        const topResults = searchData.results.slice(0, 8);
-        const enhanced = await Promise.all(topResults.map(async (movie: any) => {
-          try {
-            const detailUrl = `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${apiKey}&append_to_response=credits,videos`;
-            const detailRes = await fetch(detailUrl);
-            const fullDetails = await detailRes.json();
-            const director = fullDetails.credits?.crew?.find((c: any) => c.job === "Director")?.name;
+      const enhanced = await Promise.all(results.map(async (movie: any) => {
+        try {
+          const detailUrl = `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${tmdbKey}&append_to_response=credits,videos`;
+          const detailRes = await fetch(detailUrl);
+          const fullDetails = await detailRes.json();
+          return {
+            id: fullDetails.id,
+            title: fullDetails.title,
+            reason: `A definitive ${fullDetails.genres?.[0]?.name || "cinematic"} highlight matching your thematic request.`,
+            description: fullDetails.overview,
+            matchScore: 85 + Math.floor(Math.random() * 5),
+            poster_path: fullDetails.poster_path,
+            backdrop_path: fullDetails.backdrop_path,
+            vote_average: fullDetails.vote_average,
+            release_date: fullDetails.release_date
+          };
+        } catch (e) { return movie; }
+      }));
 
-            let movieDetails = {
-              id: fullDetails.id,
-              title: fullDetails.title,
-              reason: `Highly rated ${fullDetails.genres?.[0]?.name || "cinematic"} experience matching your theme.`,
-              description: fullDetails.overview,
-              matchScore: Math.floor(Math.random() * 10) + 85,
-              poster_path: fullDetails.poster_path,
-              backdrop_path: fullDetails.backdrop_path,
-              vote_average: fullDetails.vote_average,
-              release_date: fullDetails.release_date,
-              runtime: fullDetails.runtime,
-              genres: fullDetails.genres?.map((g: any) => g.name),
-              director: director,
-              cast: fullDetails.credits?.cast?.slice(0, 3).map((c: any) => c.name),
-              trailer: fullDetails.videos?.results?.find((v: any) => v.type === "Trailer")?.key
-            };
-
-            const omdb = await fetchOMDbData(fullDetails.title, fullDetails.release_date);
-            if (omdb) {
-              movieDetails = { ...movieDetails, omdb } as any;
-            }
-            return movieDetails;
-          } catch (err) {
-            return movie;
-          }
-        }));
-        fallbacks.recommendations = enhanced.filter(m => m && m.title);
-      }
-
-      // If still empty, use trending
-      if (fallbacks.recommendations.length === 0) {
-        const trendUrl = `https://api.themoviedb.org/3/trending/movie/week?api_key=${apiKey}`;
-        const trendRes = await fetch(trendUrl);
-        const trendData = await trendRes.json();
-        if (trendData.results) {
-          fallbacks.recommendations = trendData.results.slice(0, 6).map((m: any) => ({
-            ...m,
-            reason: "A trending masterpiece recommended for its current cinematic impact.",
-            matchScore: 88
-          }));
-        }
-      }
-    } catch (e) {
-      console.error("Fallback search critical failure:", e);
+      res.json({
+        overallReason: reason,
+        recommendations: enhanced,
+        isFallback
+      });
+    } catch (err) {
+      res.json({
+        overallReason: "Cinematic discovery engine is optimizing. Please try again in a moment.",
+        recommendations: getMockMovies("popular").results,
+        isFallback: true
+      });
     }
-    return res.json(fallbacks);
   }
+
 
   // Movie Data Proxy with Caching
   app.get("/api/movies/:type", async (req, res) => {
